@@ -1,0 +1,3 @@
+node_modules/
+dist/.entry.generated.js
+*.log

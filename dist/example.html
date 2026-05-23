@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeMirror 6</title>
+  <link rel="stylesheet" href="./codemirror.theme.css">
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #1e1e1e; color: #ccc; }
+    #editor {
+      margin: 16px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1e1e1e;
+      min-height: 220px;
+      height: 320px;
+      max-height: calc(100vh - 32px);
+      resize: vertical;
+      overflow: auto;
+    }
+    #editor .cm-editor {
+      height: 100%;
+      min-height: 100%;
+    }
+  </style>
+  <script src="./codemirror.min.js"></script>
+</head>
+<body>
+  <div id="editor"></div>
+  <script>
+    const { createEditor } = window.cm6;
+    const view = createEditor({
+      parent: document.getElementById('editor'),
+      language: "python",
+      doc: "// Your code here\\n",
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeMirror 6 打包生成器</title>
+  <link rel="stylesheet" href="/dist/codemirror.theme.css" id="theme-css" disabled>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f0f2f5;
+      --panel: #fff;
+      --border: #d8dee4;
+      --text: #1f2328;
+      --muted: #656d76;
+      --accent: #0969da;
+      --accent-hover: #0550ae;
+      --danger: #cf222e;
+      --preview-bg: #282c34;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #2f81f7;
+        --accent-hover: #58a6ff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header h1 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 600; }
+    header p { margin: 0; font-size: 0.8125rem; color: var(--muted); }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 380px) 1fr;
+      min-height: calc(100vh - 64px);
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .config {
+      padding: 16px;
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      overflow-y: auto;
+      max-height: calc(100vh - 64px);
+    }
+    .preview-pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .preview-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .preview-toolbar label { font-size: 0.8125rem; color: var(--muted); }
+    .preview-toolbar select {
+      font: inherit;
+      font-size: 0.8125rem;
+      padding: 5px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+    }
+    .editor-wrap {
+      flex: 1;
+      margin: 12px 16px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--preview-bg);
+      min-height: 220px;
+    }
+    .editor-wrap.resizable {
+      flex: 0 0 auto;
+      height: 360px;
+      max-height: calc(100vh - 130px);
+      resize: vertical;
+      overflow: auto;
+    }
+    .editor-wrap.resizable #editor,
+    .editor-wrap.resizable #editor .cm-editor {
+      height: 100%;
+      min-height: 100%;
+    }
+    #editor .cm-editor { min-height: 360px; }
+    section { margin-bottom: 18px; }
+    section h2 {
+      margin: 0 0 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .radio-row, .check-grid { display: flex; flex-direction: column; gap: 6px; }
+    .check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+    .check-grid label, .radio-row label {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      font-size: 0.8125rem;
+      cursor: pointer;
+    }
+    .check-grid input, .radio-row input { margin-top: 2px; }
+    .check-grid label.disabled { opacity: 0.45; cursor: not-allowed; }
+    .field-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      font-size: 0.8125rem;
+    }
+    .field-row input[type="text"],
+    .field-row input[type="number"] {
+      font: inherit;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      position: sticky;
+      bottom: 0;
+      background: var(--panel);
+      padding-bottom: 4px;
+    }
+    button {
+      font: inherit;
+      font-size: 0.8125rem;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+    button.primary:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 6px;
+      min-height: 1.2em;
+    }
+    .status.error { color: var(--danger); }
+    .hint { font-size: 0.75rem; color: var(--muted); margin: 4px 0 0; }
+  </style>
+  <script src="/dist/preview.bundle.js"></script>
+</head>
+<body>
+  <header>
+    <h1>CodeMirror 6 打包生成器</h1>
+    <p>勾选扩展与语言，生成压缩 IIFE（<code>codemirror.min.js</code>）及 One Dark 主题 CSS</p>
+  </header>
+
+  <div class="layout">
+    <aside class="config" id="config-panel">
+      <p class="status" id="load-status">加载配置…</p>
+    </aside>
+
+    <main class="preview-pane">
+      <div class="preview-toolbar">
+        <label for="preview-lang">预览语言</label>
+        <select id="preview-lang" aria-label="预览语言"></select>
+        <button type="button" id="reset-sample">恢复示例</button>
+      </div>
+      <div class="editor-wrap" id="editor-wrap">
+        <div id="editor"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const { createEditor } = window.cm6preview;
+    let catalog = null;
+    let state = null;
+    let view = null;
+    const container = document.getElementById('editor');
+    const panel = document.getElementById('config-panel');
+    const loadStatus = document.getElementById('load-status');
+    const langSelect = document.getElementById('preview-lang');
+    const themeCss = document.getElementById('theme-css');
+    const editorWrap = document.getElementById('editor-wrap');
+
+    function defaultFeatures(preset, catalog) {
+      const ids = preset === 'basic' ? catalog.presetBasic : catalog.presetMinimal;
+      const features = {};
+      for (const f of catalog.features) {
+        features[f.id] = ids.includes(f.id);
+      }
+      return features;
+    }
+
+    function getConfig() {
+      const preset = document.querySelector('input[name="preset"]:checked')?.value || 'basic';
+      const features = {};
+      if (preset === 'custom') {
+        panel.querySelectorAll('[data-feature]').forEach((el) => {
+          features[el.dataset.feature] = el.checked;
+        });
+      }
+      const languages = [];
+      panel.querySelectorAll('[data-language]:checked').forEach((el) => {
+        languages.push(el.dataset.language);
+      });
+      const theme = document.querySelector('input[name="theme"]:checked')?.value || 'oneDark';
+      return {
+        preset,
+        features,
+        languages,
+        theme,
+        options: {
+          lineWrapping: document.getElementById('opt-lineWrapping')?.checked ?? false,
+          scrollPastEnd: document.getElementById('opt-scrollPastEnd')?.checked ?? false,
+          readOnly: document.getElementById('opt-readOnly')?.checked ?? false,
+          resizable: document.getElementById('opt-resizable')?.checked ?? false,
+          tabSize: Number(document.getElementById('opt-tabSize')?.value) || 4,
+          placeholder: document.getElementById('opt-placeholder')?.value ?? '',
+        },
+      };
+    }
+
+    function updateFeatureControls() {
+      const preset = document.querySelector('input[name="preset"]:checked')?.value;
+      const custom = preset === 'custom';
+      panel.querySelectorAll('[data-feature]').forEach((el) => {
+        el.disabled = !custom;
+        el.closest('label')?.classList.toggle('disabled', !custom);
+      });
+    }
+
+    function syncThemeCss() {
+      const theme = document.querySelector('input[name="theme"]:checked')?.value;
+      themeCss.disabled = theme !== 'oneDark';
+    }
+
+    function syncResizableWrap() {
+      const config = getConfig();
+      editorWrap.classList.toggle('resizable', !!config.options.resizable);
+    }
+
+    function refreshPreview() {
+      const config = getConfig();
+      const lang = langSelect.value || config.languages[0] || 'python';
+      const doc = view ? view.state.doc.toString() : (catalog.samples[lang] || '');
+      if (view) view.destroy();
+      container.innerHTML = '';
+      syncResizableWrap();
+      view = createEditor({
+        parent: container,
+        doc,
+        language: lang,
+        config,
+      });
+    }
+
+    let lastPreset = 'basic';
+
+    function renderPanel() {
+      const c = catalog;
+      const cfg = state;
+      lastPreset = cfg.preset;
+      const groups = Object.fromEntries(c.featureGroups.map((g) => [g.id, g.label]));
+
+      let html = `
+        <section>
+          <h2>预设</h2>
+          <div class="radio-row">
+            ${c.presets.map((p) => `
+              <label>
+                <input type="radio" name="preset" value="${p.id}" ${cfg.preset === p.id ? 'checked' : ''}>
+                ${p.label}
+              </label>
+            `).join('')}
+          </div>
+        </section>
+      `;
+
+      const presetFeatureIds =
+        cfg.preset === 'basic'
+          ? c.presetBasic
+          : cfg.preset === 'minimal'
+            ? c.presetMinimal
+            : null;
+
+      for (const groupId of c.featureGroups.map((g) => g.id)) {
+        const items = c.features.filter((f) => f.group === groupId);
+        html += `
+          <section>
+            <h2>${groups[groupId]}</h2>
+            <div class="check-grid">
+              ${items.map((f) => {
+                const on = presetFeatureIds
+                  ? presetFeatureIds.includes(f.id)
+                  : !!cfg.features[f.id];
+                return `
+                <label class="${cfg.preset !== 'custom' ? 'disabled' : ''}">
+                  <input type="checkbox" data-feature="${f.id}"
+                    ${on ? 'checked' : ''}
+                    ${cfg.preset !== 'custom' ? 'disabled' : ''}>
+                  ${f.label}
+                </label>`;
+              }).join('')}
+            </div>
+          </section>
+        `;
+      }
+
+      html += `
+        <section>
+          <h2>语言（多选）</h2>
+          <div class="check-grid">
+            ${c.languages.map((l) => `
+              <label>
+                <input type="checkbox" data-language="${l.id}"
+                  ${cfg.languages.includes(l.id) ? 'checked' : ''}>
+                ${l.label}
+              </label>
+            `).join('')}
+          </div>
+        </section>
+
+        <section>
+          <h2>主题</h2>
+          <div class="radio-row">
+            ${c.themes.map((t) => `
+              <label>
+                <input type="radio" name="theme" value="${t.id}" ${cfg.theme === t.id ? 'checked' : ''}>
+                ${t.label}
+              </label>
+            `).join('')}
+          </div>
+        </section>
+
+        <section>
+          <h2>选项</h2>
+          ${c.options.map((o) => {
+            if (o.id === 'readOnly' || o.id === 'lineWrapping' || o.id === 'scrollPastEnd' || o.id === 'resizable') {
+              return `<label class="radio-row">
+                <span><input type="checkbox" id="opt-${o.id}" ${cfg.options[o.id] ? 'checked' : ''}> ${o.label}</span>
+              </label>`;
+            }
+            return '';
+          }).join('')}
+          <div class="field-row">
+            <label for="opt-tabSize">Tab 宽度</label>
+            <input type="number" id="opt-tabSize" min="2" max="8" value="${cfg.options.tabSize}">
+          </div>
+          <div class="field-row">
+            <label for="opt-placeholder">占位符</label>
+            <input type="text" id="opt-placeholder" value="${cfg.options.placeholder || ''}" placeholder="空文档时显示">
+          </div>
+        </section>
+
+        <section class="actions">
+          <button type="button" class="primary" id="btn-build">生成并下载 ZIP</button>
+          <button type="button" id="btn-reset-config">恢复默认</button>
+        </section>
+        <p class="status" id="build-status"></p>
+      `;
+
+      panel.innerHTML = html;
+      loadStatus.remove();
+
+      langSelect.innerHTML = cfg.languages
+        .map((id) => {
+          const meta = c.languages.find((l) => l.id === id);
+          return `<option value="${id}">${meta?.label || id}</option>`;
+        })
+        .join('');
+
+      panel.querySelectorAll('input, select').forEach((el) => {
+        el.addEventListener('change', () => {
+          if (el.name === 'preset') {
+            if (el.value === 'custom' && lastPreset !== 'custom') {
+              state.features = defaultFeatures(lastPreset, c);
+            }
+            lastPreset = el.value;
+          }
+          if (el.dataset.language) {
+            const langs = getConfig().languages;
+            if (!langs.length) {
+              el.checked = true;
+              setBuildStatus('至少选择一种语言', true);
+              return;
+            }
+            const prev = langSelect.value;
+            langSelect.innerHTML = langs
+              .map((id) => {
+                const meta = c.languages.find((l) => l.id === id);
+                return `<option value="${id}">${meta?.label || id}</option>`;
+              })
+              .join('');
+            if (langs.includes(prev)) langSelect.value = prev;
+            else langSelect.value = langs[0];
+          }
+          updateFeatureControls();
+          syncThemeCss();
+          syncResizableWrap();
+          refreshPreview();
+        });
+      });
+
+      document.getElementById('btn-reset-config').addEventListener('click', () => {
+        state = structuredClone(c.defaultConfig);
+        state.features = defaultFeatures(state.preset, c);
+        renderPanel();
+        syncThemeCss();
+        syncResizableWrap();
+        refreshPreview();
+      });
+
+      document.getElementById('btn-build').addEventListener('click', buildZip);
+      document.getElementById('opt-tabSize')?.addEventListener('input', refreshPreview);
+      document.getElementById('opt-placeholder')?.addEventListener('input', refreshPreview);
+
+      updateFeatureControls();
+      syncThemeCss();
+      syncResizableWrap();
+    }
+
+    function setBuildStatus(msg, isError) {
+      const el = document.getElementById('build-status');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.toggle('error', !!isError);
+    }
+
+    async function buildZip() {
+      const config = getConfig();
+      if (!config.languages.length) {
+        setBuildStatus('请至少选择一种语言', true);
+        return;
+      }
+      const btn = document.getElementById('btn-build');
+      btn.disabled = true;
+      setBuildStatus('正在打包…');
+      try {
+        const res = await fetch('/api/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || res.statusText);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'codemirror-bundle.zip';
+        a.click();
+        URL.revokeObjectURL(url);
+        setBuildStatus('已生成：codemirror.min.js、codemirror.theme.css（One Dark）、example.html');
+      } catch (e) {
+        setBuildStatus(e.message || String(e), true);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('reset-sample').addEventListener('click', () => {
+      const lang = langSelect.value;
+      if (view) view.destroy();
+      container.innerHTML = '';
+      view = createEditor({
+        parent: container,
+        doc: catalog.samples[lang] || '',
+        language: lang,
+        config: getConfig(),
+      });
+    });
+
+    async function init() {
+      const res = await fetch('/api/catalog');
+      catalog = await res.json();
+      state = structuredClone(catalog.defaultConfig);
+      state.features = defaultFeatures(state.preset, catalog);
+      renderPanel();
+      refreshPreview();
+    }
+
+    init().catch((e) => {
+      loadStatus.textContent = '加载失败：' + e.message;
+      loadStatus.classList.add('error');
+    });
+  </script>
+</body>
+</html>

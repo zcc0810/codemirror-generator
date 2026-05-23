@@ -1,0 +1,14 @@
+{
+  "preset": "basic",
+  "features": {},
+  "languages": ["python", "java", "cpp"],
+  "theme": "oneDark",
+  "options": {
+    "lineWrapping": false,
+    "scrollPastEnd": false,
+    "readOnly": false,
+    "resizable": false,
+    "tabSize": 4,
+    "placeholder": ""
+  }
+}
