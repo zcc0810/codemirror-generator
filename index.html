@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeMirror 6 打包生成器</title>
-  <link rel="stylesheet" href="/dist/codemirror.theme.css" id="theme-css" disabled>
+  <link rel="stylesheet" href="./dist/codemirror.theme.css" id="theme-css" disabled>
   <style>
     :root {
       color-scheme: light dark;
@@ -178,7 +178,7 @@
     .status.error { color: var(--danger); }
     .hint { font-size: 0.75rem; color: var(--muted); margin: 4px 0 0; }
   </style>
-  <script src="/dist/preview.bundle.js"></script>
+  <script src="./dist/preview.bundle.js"></script>
 </head>
 <body>
   <header>
@@ -205,6 +205,7 @@
 
   <script>
     const { createEditor } = window.cm6preview;
+    const FALLBACK_CATALOG = {"presets":[{"id":"basic","label":"basicSetup（推荐）"},{"id":"minimal","label":"minimalSetup（最小）"},{"id":"custom","label":"自定义"}],"features":[{"id":"lineNumbers","label":"行号","group":"gutter","desc":"lineNumbers"},{"id":"highlightActiveLineGutter","label":"当前行 Gutter 高亮","group":"gutter"},{"id":"foldGutter","label":"代码折叠槽","group":"gutter"},{"id":"highlightSpecialChars","label":"特殊字符占位","group":"edit"},{"id":"history","label":"撤销 / 重做","group":"edit"},{"id":"drawSelection","label":"自定义选区绘制","group":"edit"},{"id":"dropCursor","label":"拖放光标","group":"edit"},{"id":"multipleSelections","label":"多光标","group":"edit"},{"id":"indentOnInput","label":"输入时自动缩进","group":"edit"},{"id":"defaultHighlight","label":"默认语法高亮","group":"edit"},{"id":"bracketMatching","label":"括号匹配","group":"edit"},{"id":"closeBrackets","label":"自动补全括号","group":"edit"},{"id":"autocompletion","label":"自动补全","group":"edit"},{"id":"rectangularSelection","label":"矩形选择 (Alt+拖)","group":"edit"},{"id":"crosshairCursor","label":"十字光标 (Alt)","group":"edit"},{"id":"highlightActiveLine","label":"当前行高亮","group":"presentation"},{"id":"highlightSelectionMatches","label":"高亮相同选中文本","group":"presentation"},{"id":"searchKeymap","label":"搜索快捷键","group":"presentation"}],"featureGroups":[{"id":"gutter","label":"Gutter"},{"id":"edit","label":"编辑"},{"id":"presentation","label":"展示"}],"options":[{"id":"lineWrapping","label":"自动换行","group":"options"},{"id":"scrollPastEnd","label":"可滚过文档末尾","group":"options"},{"id":"readOnly","label":"只读","group":"options"},{"id":"resizable","label":"允许拖拽高度","group":"options"}],"languages":[{"id":"python","label":"Python","sample":"python"},{"id":"java","label":"Java","sample":"java"},{"id":"cpp","label":"C++","sample":"cpp"}],"themes":[{"id":"default","label":"默认（系统）"},{"id":"oneDark","label":"One Dark","className":"cm-theme-one-dark","cssFile":true}],"samples":{"python":"def greet(name):\n    return f\"Hello, {name}!\"\n\nprint(greet(\"CodeMirror 6\"))","java":"public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, CodeMirror 6!\");\n    }\n}","cpp":"#include <iostream>\n\nint main() {\n    std::cout << \"Hello, CodeMirror 6!\" << std::endl;\n    return 0;\n}"},"defaultConfig":{"preset":"basic","features":{},"languages":["python","java","cpp"],"theme":"oneDark","options":{"lineWrapping":false,"scrollPastEnd":false,"readOnly":false,"resizable":false,"tabSize":4,"placeholder":""}},"presetBasic":["lineNumbers","highlightActiveLineGutter","highlightSpecialChars","history","foldGutter","drawSelection","dropCursor","multipleSelections","indentOnInput","defaultHighlight","bracketMatching","closeBrackets","autocompletion","rectangularSelection","crosshairCursor","highlightActiveLine","highlightSelectionMatches","searchKeymap"],"presetMinimal":["highlightSpecialChars","history","drawSelection","defaultHighlight"]};
     let catalog = null;
     let state = null;
     let view = null;
@@ -460,6 +461,10 @@
     }
 
     async function buildZip() {
+      if (!window.__CM6_API_AVAILABLE__) {
+        setBuildStatus('GitHub Pages 仅支持预览；在线打包请在本地运行 npm run dev（或 npm run build）', true);
+        return;
+      }
       const config = getConfig();
       if (!config.languages.length) {
         setBuildStatus('请至少选择一种语言', true);
@@ -469,7 +474,7 @@
       btn.disabled = true;
       setBuildStatus('正在打包…');
       try {
-        const res = await fetch('/api/build', {
+        const res = await fetch('./api/build', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(config),
@@ -506,11 +511,23 @@
     });
 
     async function init() {
-      const res = await fetch('/api/catalog');
-      catalog = await res.json();
+      try {
+        const res = await fetch('./api/catalog', { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.statusText);
+        catalog = await res.json();
+        window.__CM6_API_AVAILABLE__ = true;
+      } catch {
+        catalog = FALLBACK_CATALOG;
+        window.__CM6_API_AVAILABLE__ = false;
+      }
       state = structuredClone(catalog.defaultConfig);
       state.features = defaultFeatures(state.preset, catalog);
       renderPanel();
+      if (!window.__CM6_API_AVAILABLE__) {
+        const btn = document.getElementById('btn-build');
+        if (btn) btn.disabled = true;
+        setBuildStatus('GitHub Pages 模式：在线打包不可用（仅预览）。本地运行 npm run dev / npm run build 可生成 ZIP。');
+      }
       refreshPreview();
     }
 
